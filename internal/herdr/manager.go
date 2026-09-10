@@ -570,3 +570,15 @@ func (m *Manager) SetDefaultPaneID(paneID string) {
 	defer m.mu.Unlock()
 	m.defaultPaneID = paneID
 }
+
+// CleanupSession cleanly stops and deletes the Herdr session on remote host
+func (m *Manager) CleanupSession() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	stopCmd := fmt.Sprintf("%sherdr session stop %q 2>/dev/null; herdr session delete %q 2>/dev/null", m.pathEnv, m.sessionName, m.sessionName)
+	_, _, _, _ = m.exec(stopCmd)
+	m.initialized = false
+	m.defaultPaneID = ""
+	return nil
+}

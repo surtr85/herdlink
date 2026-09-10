@@ -382,4 +382,22 @@ func registerTerminalTools(s *server.MCPServer, client *sshclient.Client) {
 
 		return mcp.NewToolResultText(fmt.Sprintf("Successfully focused workspace %s.", wsID)), nil
 	})
+
+	// 13. remote_terminal_session_cleanup
+	sessionCleanupTool := mcp.NewTool("remote_terminal_session_cleanup",
+		mcp.WithDescription("Cleanly stop and delete the active Herdr session on the remote host to release all system memory, processes, and CPU resources upon task completion."),
+	)
+
+	s.AddTool(sessionCleanupTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		hm := client.Herdr()
+		if hm == nil || !hm.IsEnabled() {
+			return mcp.NewToolResultError("Herdr terminal engine is disabled in configuration"), nil
+		}
+
+		if err := hm.CleanupSession(); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to cleanup session: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText("Herdr session successfully terminated and cleaned up to release all system resources."), nil
+	})
 }
