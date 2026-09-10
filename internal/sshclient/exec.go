@@ -1,6 +1,7 @@
 package sshclient
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -241,4 +242,38 @@ func parseCommandMarkers(output, markerExit, markerCwd string) (string, string, 
 	}
 
 	return cleanOutput, newCwd, exitCode
+}
+
+// ExecRaw executes a remote command directly over an SSH session without wrappers.
+// It returns stdout, stderr, exit code, and any transport error.
+func (c *Client) ExecRaw(cmd string) (string, string, int, error) {
+	if err := c.EnsureConnected(); err != nil {
+		return "", "", -1, err
+	}
+
+	sshCli, err := c.SSH()
+	if err != nil {
+		return "", "", -1, err
+	}
+
+	sess, err := sshCli.NewSession()
+	if err != nil {
+		return "", "", -1, fmt.Errorf("failed to create SSH session: %w", err)
+	}
+	defer sess.Close()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	sess.Stdout = &stdoutBuf
+	sess.Stderr = &stderrBuf
+
+	runErr := sess.Run(cmd)
+	code := 0
+	if runErr != nil {
+		if exitErr, ok := runErr.(*ssh.ExitError); ok {
+			code = exitErr.ExitStatus()
+		} else {
+			code = -1
+		}
+	}
+	return stdoutBuf.String(), stderrBuf.String(), code, runErr
 }

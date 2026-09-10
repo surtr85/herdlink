@@ -9,16 +9,18 @@ import (
 
 	"github.com/pkg/sftp"
 	"github.com/surtr85/mcp-ssh-workspace/internal/config"
+	"github.com/surtr85/mcp-ssh-workspace/internal/herdr"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
 
 type Client struct {
-	cfg        *config.Config
-	sshClient  *ssh.Client
-	sftpClient *sftp.Client
+	cfg          *config.Config
+	sshClient    *ssh.Client
+	sftpClient   *sftp.Client
 	taskMgr      *TaskManager
 	tunnelMgr    *TunnelManager
+	herdrMgr     *herdr.Manager
 	mu           sync.Mutex
 	cwdMu        sync.RWMutex
 	currentCwd   string
@@ -34,6 +36,7 @@ func NewClient(cfg *config.Config) *Client {
 		sudoPassword: cfg.SudoPassword,
 	}
 	c.tunnelMgr = NewTunnelManager(c.SSH)
+	c.herdrMgr = herdr.NewManager(c.ExecRaw, cfg.HerdrSessionName, cfg.AutoBootstrapHerdr, cfg.EnableHerdr)
 
 	if cfg.Host != "" {
 		if err := c.Connect(); err != nil {
@@ -75,20 +78,35 @@ func (c *Client) ConnectTo(host string, port int, user, keyPath, password, sudoP
 		sudoPassword = password
 	}
 
+	enableHerdr := true
+	autoBootstrap := true
+	sessionName := "mcp-workspace"
+	if c.cfg != nil {
+		enableHerdr = c.cfg.EnableHerdr
+		autoBootstrap = c.cfg.AutoBootstrapHerdr
+		if c.cfg.HerdrSessionName != "" {
+			sessionName = c.cfg.HerdrSessionName
+		}
+	}
+
 	newCfg := &config.Config{
-		Host:         host,
-		Port:         port,
-		User:         user,
-		KeyPath:      keyPath,
-		Password:     password,
-		SudoPassword: sudoPassword,
-		UseAgent:     true,
+		Host:               host,
+		Port:               port,
+		User:               user,
+		KeyPath:            keyPath,
+		Password:           password,
+		SudoPassword:       sudoPassword,
+		UseAgent:           true,
+		EnableHerdr:        enableHerdr,
+		AutoBootstrapHerdr: autoBootstrap,
+		HerdrSessionName:   sessionName,
 	}
 	config.ResolveHostConfig(newCfg)
 
 	c.mu.Lock()
 	c.cfg = newCfg
 	c.currentCwd = newCfg.WorkDir
+	c.herdrMgr = herdr.NewManager(c.ExecRaw, newCfg.HerdrSessionName, newCfg.AutoBootstrapHerdr, newCfg.EnableHerdr)
 	c.mu.Unlock()
 
 	c.SetSudoPassword(sudoPassword)
@@ -214,6 +232,12 @@ func (c *Client) TaskManager() *TaskManager {
 
 func (c *Client) TunnelManager() *TunnelManager {
 	return c.tunnelMgr
+}
+
+func (c *Client) Herdr() *herdr.Manager {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.herdrMgr
 }
 
 func (c *Client) SFTP() (*sftp.Client, error) {

@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+	"github.com/surtr85/mcp-ssh-workspace/internal/config"
+	"github.com/surtr85/mcp-ssh-workspace/internal/sshclient"
 )
 
 func TestParameterResolvers(t *testing.T) {
@@ -45,5 +48,45 @@ func TestParameterResolvers(t *testing.T) {
 	}
 	if got := getParamBool(reqPascal, true, "isDaemon", "IsDaemon"); got != false {
 		t.Errorf("expected false, got %v", got)
+	}
+}
+
+func TestRegisterToolsWithTerminal(t *testing.T) {
+	cfg := &config.Config{
+		EnableHerdr:        true,
+		AutoBootstrapHerdr: true,
+		HerdrSessionName:   "test-session",
+	}
+	client := sshclient.NewClient(cfg)
+	defer client.Close()
+
+	s := server.NewMCPServer("test-server", "1.0.0")
+	RegisterTools(s, client)
+
+	// Verify server registered all tools without panic
+	tools := s.ListTools()
+	foundTerminalRun := false
+	foundTerminalSplit := false
+	foundTerminalRead := false
+	for _, tool := range tools {
+		if tool.Tool.Name == "remote_terminal_run" {
+			foundTerminalRun = true
+		}
+		if tool.Tool.Name == "remote_terminal_split" {
+			foundTerminalSplit = true
+		}
+		if tool.Tool.Name == "remote_terminal_read" {
+			foundTerminalRead = true
+		}
+	}
+
+	if !foundTerminalRun {
+		t.Errorf("Expected tool remote_terminal_run to be registered")
+	}
+	if !foundTerminalSplit {
+		t.Errorf("Expected tool remote_terminal_split to be registered")
+	}
+	if !foundTerminalRead {
+		t.Errorf("Expected tool remote_terminal_read to be registered")
 	}
 }

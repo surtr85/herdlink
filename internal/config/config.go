@@ -20,7 +20,10 @@ type Config struct {
 	SudoPassword string
 	WorkDir    string
 	UseAgent   bool
-	KnownHosts string
+	KnownHosts          string
+	EnableHerdr         bool
+	AutoBootstrapHerdr  bool
+	HerdrSessionName    string
 }
 
 func Parse() (*Config, error) {
@@ -35,6 +38,9 @@ func Parse() (*Config, error) {
 	flag.StringVar(&cfg.WorkDir, "workdir", os.Getenv("SSH_WORKDIR"), "Default initial remote working directory")
 	flag.BoolVar(&cfg.UseAgent, "agent", true, "Use SSH agent ($SSH_AUTH_SOCK) if available")
 	flag.StringVar(&cfg.KnownHosts, "known-hosts", "", "Path to known_hosts file")
+	flag.BoolVar(&cfg.EnableHerdr, "herdr", true, "Enable intelligent background terminal engine via herdr")
+	flag.BoolVar(&cfg.AutoBootstrapHerdr, "herdr-bootstrap", true, "Automatically bootstrap/install herdr on remote host if not present")
+	flag.StringVar(&cfg.HerdrSessionName, "herdr-session", "mcp-workspace", "Persistent herdr session name on remote host")
 
 	flag.Parse()
 

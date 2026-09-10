@@ -14,6 +14,7 @@ import (
 
 func RegisterTools(s *server.MCPServer, client *sshclient.Client) {
 	registerCommandTools(s, client)
+	registerTerminalTools(s, client)
 	registerFileTools(s, client)
 	registerSearchTools(s, client)
 	registerTunnelTools(s, client)
@@ -137,6 +138,9 @@ func registerCommandTools(s *server.MCPServer, client *sshclient.Client) {
 		mcp.WithBoolean("IsDaemon", mcp.Description("Alias for isDaemon.")),
 		mcp.WithInteger("waitMsBeforeAsync", mcp.Description("Milliseconds to wait for the command to finish before detaching to background (default 5000ms, alias: WaitMsBeforeAsync).")),
 		mcp.WithInteger("WaitMsBeforeAsync", mcp.Description("Alias for waitMsBeforeAsync.")),
+		mcp.WithBoolean("terminal", mcp.Description("Execute command inside intelligent persistent background terminal pane (herdr) with real PTY/TUI (alias: Terminal, useTerminal).")),
+		mcp.WithBoolean("Terminal", mcp.Description("Alias for terminal.")),
+		mcp.WithBoolean("useTerminal", mcp.Description("Alias for terminal.")),
 	)
 
 	s.AddTool(runCmdTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -149,6 +153,16 @@ func registerCommandTools(s *server.MCPServer, client *sshclient.Client) {
 		sudoPassword := getParamString(request, "sudoPassword", "SudoPassword", "sudo_password")
 		isDaemon := getParamBool(request, false, "isDaemon", "IsDaemon", "is_daemon", "daemon")
 		waitMs := getParamInt(request, 5000, "waitMsBeforeAsync", "WaitMsBeforeAsync", "wait_ms_before_async", "timeout")
+		useTerminal := getParamBool(request, false, "terminal", "Terminal", "useTerminal", "UseTerminal")
+
+		if useTerminal && client.Herdr() != nil && client.Herdr().IsEnabled() {
+			termRes, err := client.Herdr().RunInPane("", cmd, cwd, "", "", waitMs)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Terminal execution error: %v", err)), nil
+			}
+			jsonBytes, _ := json.MarshalIndent(termRes, "", "  ")
+			return mcp.NewToolResultText(string(jsonBytes)), nil
+		}
 
 		res, err := client.RunCommand(cmd, cwd, isDaemon, waitMs, sshclient.CommandOptions{
 			SudoPassword: sudoPassword,

@@ -17,7 +17,7 @@
 
 ---
 
-[Key Features](#-why-mcp-ssh-workspace) • [Benchmarks](#-real-world-benchmarks) • [Architecture](#-architecture) • [The 14 Tools](#-the-14-agent-primitives) • [Tool Reference](#-detailed-tool-reference--examples) • [Quickstart](#-quickstart--installation) • [Client Setup](#-mcp-client-configurations) • [NixOS Integration](#-declarative-nixos--home-manager)
+[Key Features](#-why-mcp-ssh-workspace) • [Benchmarks](#-real-world-benchmarks) • [Architecture](#-architecture) • [The 22 Tools](#-the-22-agent-primitives) • [Tool Reference](#-detailed-tool-reference--examples) • [Quickstart](#-quickstart--installation) • [Client Setup](#-mcp-client-configurations) • [NixOS Integration](#-declarative-nixos--home-manager)
 
 ---
 
@@ -164,21 +164,31 @@ flowchart TD
 
 ---
 
-## 🛠️ The 14 Agent Primitives
+## 🛠️ The 22 Agent Primitives
 
-`mcp-ssh-workspace` exposes 14 surgical tools specifically tailored to LLM reasoning:
+`mcp-ssh-workspace` exposes 22 surgical tools specifically tailored to LLM reasoning:
 
-### 1. Connection & Session Lifecycle
+### 1. 🧠 Intelligent Background Terminal Engine (`herdr`)
+- **`remote_terminal_run`**: Execute commands inside persistent background terminal panes with real PTY and full TUI support (`htop`, `lazygit`, `vim`, interactive wizards).
+- **`remote_terminal_split`**: Split terminal panes horizontally (`right`) or vertically (`down`) for concurrent multitasking and parallel build/worker orchestration.
+- **`remote_terminal_read`**: Read clean terminal buffers and scrollback (`recent-unwrapped`, `visible` viewport, or `detection` snapshot) in text or ANSI colors.
+- **`remote_terminal_send_keys`**: Dispatch logical keystrokes to interactive terminal apps (`ctrl+c`, `esc`, `enter`, `up`, `down`, `q`).
+- **`remote_terminal_send_text`**: Send literal text or input lines into running terminal panes with bracketed paste mode support.
+- **`remote_terminal_wait`**: Block until terminal output matches a literal string or regular expression pattern.
+- **`remote_terminal_list`**: Inspect full session runtime state (workspaces, tabs, panes, and running agent processes).
+- **`remote_terminal_close`**: Cleanly close a terminal pane and terminate its child process.
+
+### 2. Connection & Session Lifecycle
 - **`remote_connect`**: Dynamically connect or switch between remote hosts at runtime. Auto-resolves hosts, ports, identity files, and proxies from `~/.ssh/config`.
 - **`remote_disconnect`**: Cleanly terminate active SSH and SFTP channels.
 - **`remote_session_info`**: Fetch remote host environment metadata (`/etc/os-release`, `uname -mrs`, active user, and persistent `cwd`).
 
-### 2. Terminal & Process Supervision
-- **`remote_run_command`**: Execute commands with clean `stdout`/`stderr` separation, exit code capture, and persistent directory retention (POSIX & Fish shell safe).
+### 3. Classic Terminal & Process Supervision
+- **`remote_run_command`**: Execute commands with clean `stdout`/`stderr` separation, exit code capture, persistent directory retention, and optional `terminal: true` routing.
 - **`remote_manage_task`**: Manage long-running daemons, test runners, and dev servers (`action: "list" | "status" | "tail" | "kill" | "send_input"`).
   - Use `action: "tail"` with `lines: 50` to inspect live progress of long builds without token blowout!
 
-### 3. Surgical SFTP File Operations & Streaming Sync
+### 4. Surgical SFTP File Operations & Streaming Sync
 - **`remote_view_file`**: Read files with token-safe line ranges (`startLine` to `endLine`), line numbering, and byte budget protections.
 - **`remote_replace_file_content`**: Surgically replace an exact code block without rewriting or risking whole-file corruption.
 - **`remote_write_file`**: Atomically create or overwrite remote files with automatic recursive directory creation (`mkdir -p`).
@@ -186,11 +196,11 @@ flowchart TD
 - **`remote_download_file`**: Stream download remote files directly to the local filesystem with bit-for-bit integrity.
 - **`remote_list_dir`**: Inspect remote directory listings with exact byte sizes, POSIX permissions, and modification timestamps.
 
-### 4. High-Performance Code Search
+### 5. High-Performance Code Search
 - **`remote_grep_search`**: Fast regex search across the remote workspace (automatically uses `rg` if present, fallback to `grep -rn`).
 - **`remote_find_by_name`**: Fast file and directory glob finding with smart dotfile matching (automatically uses `fd` if present, fallback to `find`).
 
-### 5. Dynamic Port Forwarding & Networking
+### 6. Dynamic Port Forwarding & Networking
 - **`remote_tunnel`**: Establish local-to-remote SSH port forwarding tunnels (`action: "open" | "close" | "list"`).
   - Open a remote web app, API, or database directly to `http://127.0.0.1:<port>` for browser inspection, Playwright testing, or local curl!
 
