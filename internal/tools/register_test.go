@@ -68,6 +68,8 @@ func TestRegisterToolsWithTerminal(t *testing.T) {
 	foundTerminalRun := false
 	foundTerminalSplit := false
 	foundTerminalRead := false
+	foundWsCreate := false
+	foundWsList := false
 	for _, tool := range tools {
 		if tool.Tool.Name == "remote_terminal_run" {
 			foundTerminalRun = true
@@ -77,6 +79,12 @@ func TestRegisterToolsWithTerminal(t *testing.T) {
 		}
 		if tool.Tool.Name == "remote_terminal_read" {
 			foundTerminalRead = true
+		}
+		if tool.Tool.Name == "remote_terminal_workspace_create" {
+			foundWsCreate = true
+		}
+		if tool.Tool.Name == "remote_terminal_workspace_list" {
+			foundWsList = true
 		}
 	}
 
@@ -88,5 +96,11 @@ func TestRegisterToolsWithTerminal(t *testing.T) {
 	}
 	if !foundTerminalRead {
 		t.Errorf("Expected tool remote_terminal_read to be registered")
+	}
+	if !foundWsCreate {
+		t.Errorf("Expected tool remote_terminal_workspace_create to be registered")
+	}
+	if !foundWsList {
+		t.Errorf("Expected tool remote_terminal_workspace_list to be registered")
 	}
 }

@@ -198,6 +198,103 @@ func (m *Manager) ListPanes() ([]Pane, error) {
 	return resp.Result.Panes, nil
 }
 
+// ListWorkspaces returns all active workspaces in the session
+func (m *Manager) ListWorkspaces() ([]Workspace, error) {
+	if err := m.EnsureReady(); err != nil {
+		return nil, err
+	}
+
+	cmd := m.herdrCmd("workspace", "list")
+	stdout, stderr, code, err := m.exec(cmd)
+	if err != nil || code != 0 {
+		return nil, fmt.Errorf("failed to list workspaces: %v (stderr: %s)", err, stderr)
+	}
+
+	var resp WorkspaceListResponse
+	if err := json.Unmarshal([]byte(stdout), &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse workspace list JSON: %w (raw: %s)", err, stdout)
+	}
+	if resp.Error != nil {
+		return nil, fmt.Errorf("herdr error (%s): %s", resp.Error.Code, resp.Error.Message)
+	}
+
+	return resp.Result.Workspaces, nil
+}
+
+// CreateWorkspace creates a new full-screen isolated workspace/terminal
+func (m *Manager) CreateWorkspace(label, cwd string, noFocus bool) (*WorkspaceCreateResponse, error) {
+	if err := m.EnsureReady(); err != nil {
+		return nil, err
+	}
+
+	args := []string{"workspace", "create"}
+	if label != "" {
+		args = append(args, "--label", label)
+	}
+	if cwd != "" {
+		args = append(args, "--cwd", cwd)
+	}
+	if noFocus {
+		args = append(args, "--no-focus")
+	}
+
+	cmd := m.herdrCmd(args...)
+	stdout, stderr, code, err := m.exec(cmd)
+	if err != nil || code != 0 {
+		return nil, fmt.Errorf("failed to create workspace: %v (stderr: %s)", err, stderr)
+	}
+
+	var resp WorkspaceCreateResponse
+	if err := json.Unmarshal([]byte(stdout), &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse workspace create JSON: %w (raw: %s)", err, stdout)
+	}
+	if resp.Error != nil {
+		return nil, fmt.Errorf("herdr error (%s): %s", resp.Error.Code, resp.Error.Message)
+	}
+
+	if resp.Result.RootPane.PaneID != "" {
+		m.SetDefaultPaneID(resp.Result.RootPane.PaneID)
+	}
+
+	return &resp, nil
+}
+
+// CloseWorkspace cleanly terminates a workspace and all its panes
+func (m *Manager) CloseWorkspace(workspaceID string) error {
+	if err := m.EnsureReady(); err != nil {
+		return err
+	}
+	if workspaceID == "" {
+		return fmt.Errorf("workspaceID is required")
+	}
+
+	cmd := m.herdrCmd("workspace", "close", workspaceID)
+	_, stderr, code, err := m.exec(cmd)
+	if err != nil || code != 0 {
+		return fmt.Errorf("failed to close workspace %s: %v (stderr: %s)", workspaceID, err, stderr)
+	}
+
+	return nil
+}
+
+// FocusWorkspace focuses a workspace
+func (m *Manager) FocusWorkspace(workspaceID string) error {
+	if err := m.EnsureReady(); err != nil {
+		return err
+	}
+	if workspaceID == "" {
+		return fmt.Errorf("workspaceID is required")
+	}
+
+	cmd := m.herdrCmd("workspace", "focus", workspaceID)
+	_, stderr, code, err := m.exec(cmd)
+	if err != nil || code != 0 {
+		return fmt.Errorf("failed to focus workspace %s: %v (stderr: %s)", workspaceID, err, stderr)
+	}
+
+	return nil
+}
+
 // SplitPane splits an existing pane horizontally (right) or vertically (down)
 func (m *Manager) SplitPane(direction, cwd, targetPaneID string, noFocus bool) (*Pane, error) {
 	if err := m.EnsureReady(); err != nil {

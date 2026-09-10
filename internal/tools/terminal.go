@@ -18,6 +18,9 @@ func registerTerminalTools(s *server.MCPServer, client *sshclient.Client) {
 		mcp.WithString("commandLine", mcp.Description("The exact command line string to execute in the terminal pane (Required, alias: command, CommandLine).")),
 		mcp.WithString("CommandLine", mcp.Description("Alias for commandLine.")),
 		mcp.WithString("command", mcp.Description("Alias for commandLine.")),
+		mcp.WithString("workspaceId", mcp.Description("Target workspace/space ID (e.g. 'w1', 'w2'). Runs in the workspace's root pane (alias: WorkspaceId, space).")),
+		mcp.WithString("WorkspaceId", mcp.Description("Alias for workspaceId.")),
+		mcp.WithString("space", mcp.Description("Alias for workspaceId.")),
 		mcp.WithString("paneId", mcp.Description("Target pane ID (e.g. 'w1:p1'). If omitted, runs in the active/default pane (alias: PaneId, pane).")),
 		mcp.WithString("PaneId", mcp.Description("Alias for paneId.")),
 		mcp.WithString("pane", mcp.Description("Alias for paneId.")),
@@ -36,7 +39,11 @@ func registerTerminalTools(s *server.MCPServer, client *sshclient.Client) {
 		if cmd == "" {
 			return mcp.NewToolResultError("commandLine is required"), nil
 		}
+		workspaceID := getParamString(request, "workspaceId", "WorkspaceId", "space", "Space")
 		paneID := getParamString(request, "paneId", "PaneId", "pane_id", "pane", "Pane")
+		if paneID == "" && workspaceID != "" {
+			paneID = workspaceID + ":p1"
+		}
 		cwd := getParamString(request, "cwd", "Cwd")
 		match := getParamString(request, "waitMatch", "WaitMatch", "match", "Match")
 		regex := getParamString(request, "waitRegex", "WaitRegex", "regex", "Regex")
@@ -271,5 +278,108 @@ func registerTerminalTools(s *server.MCPServer, client *sshclient.Client) {
 		}
 
 		return mcp.NewToolResultText(fmt.Sprintf("Terminal pane %s successfully closed.", paneID)), nil
+	})
+
+	// 9. remote_terminal_workspace_create
+	wsCreateTool := mcp.NewTool("remote_terminal_workspace_create",
+		mcp.WithDescription("Create a new full-screen, isolated terminal workspace (space) for distraction-free human and agent multitasking."),
+		mcp.WithString("label", mcp.Description("Descriptive label or name for the workspace (e.g. 'server-logs', 'dev', 'monitor', alias: Label, name).")),
+		mcp.WithString("Label", mcp.Description("Alias for label.")),
+		mcp.WithString("name", mcp.Description("Alias for label.")),
+		mcp.WithString("cwd", mcp.Description("Initial working directory for the workspace (alias: Cwd).")),
+		mcp.WithString("Cwd", mcp.Description("Alias for cwd.")),
+		mcp.WithBoolean("noFocus", mcp.Description("If true, do not switch active UI focus to the new workspace (default false, alias: NoFocus).")),
+		mcp.WithBoolean("NoFocus", mcp.Description("Alias for noFocus.")),
+	)
+
+	s.AddTool(wsCreateTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		label := getParamString(request, "label", "Label", "name", "Name")
+		cwd := getParamString(request, "cwd", "Cwd")
+		noFocus := getParamBool(request, false, "noFocus", "NoFocus")
+
+		hm := client.Herdr()
+		if hm == nil || !hm.IsEnabled() {
+			return mcp.NewToolResultError("Herdr terminal engine is disabled in configuration"), nil
+		}
+
+		ws, err := hm.CreateWorkspace(label, cwd, noFocus)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to create workspace: %v", err)), nil
+		}
+
+		out, _ := json.MarshalIndent(ws.Result, "", "  ")
+		return mcp.NewToolResultText(string(out)), nil
+	})
+
+	// 10. remote_terminal_workspace_close
+	wsCloseTool := mcp.NewTool("remote_terminal_workspace_close",
+		mcp.WithDescription("Close a full workspace (space) and terminate all processes and panes running inside it."),
+		mcp.WithString("workspaceId", mcp.Description("Target workspace ID to close (e.g. 'w1', 'w2', Required, alias: WorkspaceId, id).")),
+		mcp.WithString("WorkspaceId", mcp.Description("Alias for workspaceId.")),
+		mcp.WithString("id", mcp.Description("Alias for workspaceId.")),
+	)
+
+	s.AddTool(wsCloseTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		wsID := getParamString(request, "workspaceId", "WorkspaceId", "id", "ID")
+		if wsID == "" {
+			return mcp.NewToolResultError("workspaceId is required"), nil
+		}
+
+		hm := client.Herdr()
+		if hm == nil || !hm.IsEnabled() {
+			return mcp.NewToolResultError("Herdr terminal engine is disabled in configuration"), nil
+		}
+
+		if err := hm.CloseWorkspace(wsID); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to close workspace: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(fmt.Sprintf("Workspace %s successfully closed.", wsID)), nil
+	})
+
+	// 11. remote_terminal_workspace_list
+	wsListTool := mcp.NewTool("remote_terminal_workspace_list",
+		mcp.WithDescription("List all active full-screen terminal spaces (workspaces) with active tab, pane count, and focus status."),
+	)
+
+	s.AddTool(wsListTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		hm := client.Herdr()
+		if hm == nil || !hm.IsEnabled() {
+			return mcp.NewToolResultError("Herdr terminal engine is disabled in configuration"), nil
+		}
+
+		workspaces, err := hm.ListWorkspaces()
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to list workspaces: %v", err)), nil
+		}
+
+		out, _ := json.MarshalIndent(workspaces, "", "  ")
+		return mcp.NewToolResultText(string(out)), nil
+	})
+
+	// 12. remote_terminal_workspace_focus
+	wsFocusTool := mcp.NewTool("remote_terminal_workspace_focus",
+		mcp.WithDescription("Switch user active view/focus to a specific terminal space (workspace)."),
+		mcp.WithString("workspaceId", mcp.Description("Target workspace ID to focus (e.g. 'w1', 'w2', Required, alias: WorkspaceId, id).")),
+		mcp.WithString("WorkspaceId", mcp.Description("Alias for workspaceId.")),
+		mcp.WithString("id", mcp.Description("Alias for workspaceId.")),
+	)
+
+	s.AddTool(wsFocusTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		wsID := getParamString(request, "workspaceId", "WorkspaceId", "id", "ID")
+		if wsID == "" {
+			return mcp.NewToolResultError("workspaceId is required"), nil
+		}
+
+		hm := client.Herdr()
+		if hm == nil || !hm.IsEnabled() {
+			return mcp.NewToolResultError("Herdr terminal engine is disabled in configuration"), nil
+		}
+
+		if err := hm.FocusWorkspace(wsID); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Failed to focus workspace: %v", err)), nil
+		}
+
+		return mcp.NewToolResultText(fmt.Sprintf("Successfully focused workspace %s.", wsID)), nil
 	})
 }
