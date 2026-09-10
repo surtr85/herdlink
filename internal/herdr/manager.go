@@ -276,7 +276,7 @@ func (m *Manager) RunInPane(paneID, command, cwd, waitMatch, waitRegex string, t
 
 	// Wait for expected output if requested
 	if waitMatch != "" || waitRegex != "" {
-		waitArgs := []string{"pane", "wait-output"}
+		waitArgs := []string{"pane", "wait-output", targetPane}
 		if waitMatch != "" {
 			waitArgs = append(waitArgs, "--match", waitMatch)
 		} else {
@@ -285,7 +285,6 @@ func (m *Manager) RunInPane(paneID, command, cwd, waitMatch, waitRegex string, t
 		if timeoutMs > 0 {
 			waitArgs = append(waitArgs, "--timeout", fmt.Sprintf("%d", timeoutMs))
 		}
-		waitArgs = append(waitArgs, targetPane)
 
 		waitCmd := m.herdrCmd(waitArgs...)
 		_, waitErrOut, waitCode, waitErr := m.exec(waitCmd)
@@ -322,9 +321,6 @@ func (m *Manager) ReadPane(paneID, source string, lines int, format string) (str
 	if source == "" {
 		source = "recent-unwrapped"
 	}
-	if lines <= 0 {
-		lines = 100
-	}
 	if format == "" {
 		format = "text"
 	}
@@ -336,7 +332,10 @@ func (m *Manager) ReadPane(paneID, source string, lines int, format string) (str
 		m.mu.RUnlock()
 	}
 
-	args := []string{"pane", "read", "--source", source, "--lines", fmt.Sprintf("%d", lines), "--format", format, targetPane}
+	args := []string{"pane", "read", targetPane, "--source", source, "--format", format}
+	if lines > 100 {
+		args = append(args, "--lines", fmt.Sprintf("%d", lines))
+	}
 	cmd := m.herdrCmd(args...)
 
 	stdout, stderr, code, err := m.exec(cmd)
@@ -344,7 +343,22 @@ func (m *Manager) ReadPane(paneID, source string, lines int, format string) (str
 		return "", fmt.Errorf("failed to read pane %s: %v (stderr: %s)", targetPane, err, stderr)
 	}
 
+	if lines > 0 {
+		stdout = tailLines(stdout, lines)
+	}
+
 	return stdout, nil
+}
+
+func tailLines(s string, n int) string {
+	if s == "" || n <= 0 {
+		return s
+	}
+	parts := strings.Split(strings.TrimRight(s, "\n"), "\n")
+	if len(parts) <= n {
+		return s
+	}
+	return strings.Join(parts[len(parts)-n:], "\n") + "\n"
 }
 
 // SendKeys sends logical keys (e.g. "ctrl+c", "esc", "enter", "up", "down") to a pane
@@ -404,7 +418,7 @@ func (m *Manager) WaitOutput(paneID, match, regex string, timeoutMs int) error {
 		m.mu.RUnlock()
 	}
 
-	args := []string{"pane", "wait-output"}
+	args := []string{"pane", "wait-output", targetPane}
 	if match != "" {
 		args = append(args, "--match", match)
 	} else if regex != "" {
@@ -416,7 +430,6 @@ func (m *Manager) WaitOutput(paneID, match, regex string, timeoutMs int) error {
 	if timeoutMs > 0 {
 		args = append(args, "--timeout", fmt.Sprintf("%d", timeoutMs))
 	}
-	args = append(args, targetPane)
 
 	cmd := m.herdrCmd(args...)
 	_, stderr, code, err := m.exec(cmd)
@@ -439,7 +452,7 @@ func (m *Manager) ClosePane(paneID string) error {
 		m.mu.RUnlock()
 	}
 
-	cmd := m.herdrCmd("pane", "close", "--pane", targetPane)
+	cmd := m.herdrCmd("pane", "close", targetPane)
 	_, stderr, code, err := m.exec(cmd)
 	if err != nil || code != 0 {
 		return fmt.Errorf("failed to close pane %s: %v (stderr: %s)", targetPane, err, stderr)
