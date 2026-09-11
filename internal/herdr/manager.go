@@ -274,6 +274,16 @@ func (m *Manager) CloseWorkspace(workspaceID string) error {
 		return fmt.Errorf("failed to close workspace %s: %v (stderr: %s)", workspaceID, err, stderr)
 	}
 
+	m.mu.Lock()
+	if strings.HasPrefix(m.defaultPaneID, workspaceID+":") {
+		m.defaultPaneID = ""
+	}
+	m.mu.Unlock()
+
+	if panes, err := m.ListPanes(); err == nil && len(panes) > 0 {
+		m.SetDefaultPaneID(panes[0].PaneID)
+	}
+
 	return nil
 }
 
@@ -367,6 +377,14 @@ func (m *Manager) RunInPane(paneID, command, cwd, waitMatch, waitRegex string, t
 	// Run command inside pane
 	runCmd := m.herdrCmd("pane", "run", targetPane, command)
 	_, stderr, code, err := m.exec(runCmd)
+	if (err != nil || code != 0) && paneID == "" && strings.Contains(stderr, "pane_not_found") {
+		if panes, listErr := m.ListPanes(); listErr == nil && len(panes) > 0 {
+			targetPane = panes[0].PaneID
+			m.SetDefaultPaneID(targetPane)
+			runCmd = m.herdrCmd("pane", "run", targetPane, command)
+			_, stderr, code, err = m.exec(runCmd)
+		}
+	}
 	if err != nil || code != 0 {
 		return nil, fmt.Errorf("failed to run command in pane %s: %v (stderr: %s)", targetPane, err, stderr)
 	}
