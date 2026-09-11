@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -78,12 +79,16 @@ func registerLocalHerdrTools(s *server.MCPServer, client *sshclient.Client) {
 			return mcp.NewToolResultText(fmt.Sprintf("Local workspace '%s' (%s) is already open and attached.", label, wsID)), nil
 		}
 
-		sshCmd := fmt.Sprintf("ssh %s", host)
-		wsID, paneID, err := herdr.LocalHerdrWorkspaceCreate(label, "", sshCmd, false)
+		target := host
+		if client != nil && client.User() != "" && !strings.Contains(host, "@") {
+			target = fmt.Sprintf("%s@%s", client.User(), host)
+		}
+		herdrRemoteCmd := fmt.Sprintf("herdr --remote %s", target)
+		wsID, paneID, err := herdr.LocalHerdrWorkspaceCreate(label, "", herdrRemoteCmd, false)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to attach local Herdr: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Attached local Herdr workspace '%s' (%s, pane %s) via %s", label, wsID, paneID, sshCmd)), nil
+		return mcp.NewToolResultText(fmt.Sprintf("Attached local Herdr workspace '%s' (%s, pane %s) via %s", label, wsID, paneID, herdrRemoteCmd)), nil
 	})
 }

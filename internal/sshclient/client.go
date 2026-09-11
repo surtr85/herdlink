@@ -254,6 +254,24 @@ func (c *Client) SSH() (*ssh.Client, error) {
 	return c.sshClient, nil
 }
 
+func (c *Client) User() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cfg != nil {
+		return c.cfg.User
+	}
+	return ""
+}
+
+func (c *Client) Host() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cfg != nil {
+		return c.cfg.Host
+	}
+	return ""
+}
+
 func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

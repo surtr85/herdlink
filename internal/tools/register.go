@@ -137,8 +137,12 @@ func registerCommandTools(s *server.MCPServer, client *sshclient.Client) {
 			if wsID, exists := herdr.LocalHerdrFindWorkspaceByLabel(localLabel); exists {
 				localHerdrStatus = fmt.Sprintf("Local Herdr: Attached (workspace: %s [%s])", localLabel, wsID)
 			} else {
-				sshCmd := fmt.Sprintf("ssh -t %s 'export PATH=\"$HOME/.local/bin:$PATH\"; herdr attach mcp-workspace || exec $SHELL'", host)
-				if wsID, paneID, err := herdr.LocalHerdrWorkspaceCreate(localLabel, "", sshCmd, false); err == nil {
+				target := host
+				if client.User() != "" && !strings.Contains(host, "@") {
+					target = fmt.Sprintf("%s@%s", client.User(), host)
+				}
+				herdrRemoteCmd := fmt.Sprintf("herdr --remote %s", target)
+				if wsID, paneID, err := herdr.LocalHerdrWorkspaceCreate(localLabel, "", herdrRemoteCmd, false); err == nil {
 					localHerdrStatus = fmt.Sprintf("Local Herdr: Synced (workspace: %s [%s], pane: %s)", localLabel, wsID, paneID)
 				}
 			}
