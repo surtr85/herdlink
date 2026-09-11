@@ -59,8 +59,7 @@ func registerTerminalTools(s *server.MCPServer, client *sshclient.Client) {
 			return mcp.NewToolResultError(fmt.Sprintf("Terminal execution error: %v", err)), nil
 		}
 
-		out, _ := json.MarshalIndent(res, "", "  ")
-		return mcp.NewToolResultText(string(out)), nil
+		return mcp.NewToolResultText(res.Stdout), nil
 	})
 
 	// 2. remote_terminal_split
@@ -101,22 +100,24 @@ func registerTerminalTools(s *server.MCPServer, client *sshclient.Client) {
 
 	// 3. remote_terminal_read
 	readTool := mcp.NewTool("remote_terminal_read",
-		mcp.WithDescription("Read terminal screen buffer or scrollback from a persistent pane without overloading context budgets. Supports visible viewport, recent unwrapped logs, or detection snapshot."),
+		mcp.WithDescription("Read terminal screen buffer or scrollback from a persistent pane with automatic token capping and ANSI cleaning. Supports visible viewport, recent unwrapped logs, or detection snapshot."),
 		mcp.WithString("paneId", mcp.Description("Target pane ID (e.g. 'w1:p1'). If omitted, reads from active/default pane (alias: PaneId, pane).")),
 		mcp.WithString("PaneId", mcp.Description("Alias for paneId.")),
 		mcp.WithString("pane", mcp.Description("Alias for paneId.")),
 		mcp.WithString("source", mcp.Description("Terminal snapshot source: 'recent-unwrapped' (clean unwrapped logs), 'visible' (rendered viewport), 'recent' (recent lines), 'detection' (bottom buffer) (default 'recent-unwrapped', alias: Source).")),
 		mcp.WithString("Source", mcp.Description("Alias for source.")),
-		mcp.WithInteger("lines", mcp.Description("Number of lines to read from scrollback (default 100, alias: Lines).")),
+		mcp.WithInteger("lines", mcp.Description("Number of lines to read from scrollback (default 40, alias: Lines, maxLines, MaxLines).")),
 		mcp.WithInteger("Lines", mcp.Description("Alias for lines.")),
-		mcp.WithString("format", mcp.Description("Output format: 'text' (plain text, default) or 'ansi' (preserved terminal colors) (alias: Format).")),
+		mcp.WithInteger("maxLines", mcp.Description("Alias for lines.")),
+		mcp.WithInteger("MaxLines", mcp.Description("Alias for lines.")),
+		mcp.WithString("format", mcp.Description("Output format: 'text' (plain text with ANSI stripped, default) or 'ansi' (preserved terminal colors) (alias: Format).")),
 		mcp.WithString("Format", mcp.Description("Alias for format.")),
 	)
 
 	s.AddTool(readTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		paneID := getParamString(request, "paneId", "PaneId", "pane", "Pane")
 		source := getParamString(request, "source", "Source")
-		lines := getParamInt(request, 100, "lines", "Lines")
+		lines := getParamInt(request, 40, "lines", "Lines", "maxLines", "MaxLines")
 		format := getParamString(request, "format", "Format")
 
 		hm := client.Herdr()

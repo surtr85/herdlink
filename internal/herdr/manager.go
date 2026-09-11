@@ -397,8 +397,8 @@ func (m *Manager) RunInPane(paneID, command, cwd, waitMatch, waitRegex string, t
 		time.Sleep(sleepDuration)
 	}
 
-	// Read pane buffer output
-	readOut, _ := m.ReadPane(targetPane, "recent-unwrapped", 100, "text")
+	// Read pane buffer output (default capped to 50 lines to conserve tokens)
+	readOut, _ := m.ReadPane(targetPane, "recent-unwrapped", 50, "text")
 
 	return &TerminalRunResult{
 		Stdout:     readOut,
@@ -409,7 +409,27 @@ func (m *Manager) RunInPane(paneID, command, cwd, waitMatch, waitRegex string, t
 	}, nil
 }
 
-// ReadPane reads output from a pane's screen buffer or scrollback
+type SessionStatus struct {
+	SessionName   string `json:"session_name"`
+	DefaultPaneID string `json:"default_pane_id"`
+	ServerRunning bool   `json:"server_running"`
+}
+
+// SessionStatus returns the current live Herdr session status
+func (m *Manager) SessionStatus() (*SessionStatus, error) {
+	if err := m.EnsureReady(); err != nil {
+		return nil, err
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return &SessionStatus{
+		SessionName:   m.sessionName,
+		DefaultPaneID: m.defaultPaneID,
+		ServerRunning: m.available,
+	}, nil
+}
+
+// ReadPane reads output from a pane's screen buffer or scrollback with smart token truncation and optional ANSI stripping
 func (m *Manager) ReadPane(paneID, source string, lines int, format string) (string, error) {
 	if err := m.EnsureReady(); err != nil {
 		return "", err
@@ -429,9 +449,14 @@ func (m *Manager) ReadPane(paneID, source string, lines int, format string) (str
 		m.mu.RUnlock()
 	}
 
+	fetchLines := lines
+	if fetchLines <= 0 {
+		fetchLines = 50
+	}
+
 	args := []string{"pane", "read", targetPane, "--source", source, "--format", format}
-	if lines > 100 {
-		args = append(args, "--lines", fmt.Sprintf("%d", lines))
+	if fetchLines > 100 {
+		args = append(args, "--lines", fmt.Sprintf("%d", fetchLines))
 	}
 	cmd := m.herdrCmd(args...)
 
@@ -440,22 +465,15 @@ func (m *Manager) ReadPane(paneID, source string, lines int, format string) (str
 		return "", fmt.Errorf("failed to read pane %s: %v (stderr: %s)", targetPane, err, stderr)
 	}
 
-	if lines > 0 {
-		stdout = tailLines(stdout, lines)
+	if format != "ansi" {
+		stdout = StripAnsi(stdout)
+	}
+
+	if fetchLines > 0 {
+		stdout = SmartTruncate(stdout, fetchLines)
 	}
 
 	return stdout, nil
-}
-
-func tailLines(s string, n int) string {
-	if s == "" || n <= 0 {
-		return s
-	}
-	parts := strings.Split(strings.TrimRight(s, "\n"), "\n")
-	if len(parts) <= n {
-		return s
-	}
-	return strings.Join(parts[len(parts)-n:], "\n") + "\n"
 }
 
 // SendKeys sends logical keys (e.g. "ctrl+c", "esc", "enter", "up", "down") to a pane

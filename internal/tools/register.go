@@ -9,12 +9,15 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/surtr85/mcp-ssh-workspace/internal/herdr"
 	"github.com/surtr85/mcp-ssh-workspace/internal/sshclient"
 )
 
 func RegisterTools(s *server.MCPServer, client *sshclient.Client) {
 	registerCommandTools(s, client)
 	registerTerminalTools(s, client)
+	registerAgentTools(s, client)
+	registerLocalHerdrTools(s, client)
 	registerFileTools(s, client)
 	registerSearchTools(s, client)
 	registerTunnelTools(s, client)
@@ -62,7 +65,7 @@ func getParamStringSlice(req mcp.CallToolRequest, keys ...string) []string {
 func registerCommandTools(s *server.MCPServer, client *sshclient.Client) {
 	// 0. remote_connect
 	connectTool := mcp.NewTool("remote_connect",
-		mcp.WithDescription("Connect to a remote SSH host dynamically. Resolves ~/.ssh/config aliases automatically."),
+		mcp.WithDescription("Unified 1-step connection to remote SSH host. Automatically initializes remote Herdr daemon, syncs with local Herdr workspace, and configures privileges with minimal token footprint."),
 		mcp.WithString("host", mcp.Description("Remote SSH host, IP, or ~/.ssh/config alias (Required, alias: Host).")),
 		mcp.WithString("Host", mcp.Description("Alias for host.")),
 		mcp.WithInteger("port", mcp.Description("SSH port (default 22, alias: Port).")),
@@ -75,6 +78,12 @@ func registerCommandTools(s *server.MCPServer, client *sshclient.Client) {
 		mcp.WithString("Password", mcp.Description("Alias for password.")),
 		mcp.WithString("sudoPassword", mcp.Description("Sudo password for privileged remote commands (alias: SudoPassword, sudo_password).")),
 		mcp.WithString("SudoPassword", mcp.Description("Alias for sudoPassword.")),
+		mcp.WithBoolean("syncLocalHerdr", mcp.Description("Automatically open an interactive terminal workspace in local running Herdr client for the human user (default true, alias: SyncLocalHerdr, syncLocal).")),
+		mcp.WithBoolean("SyncLocalHerdr", mcp.Description("Alias for syncLocalHerdr.")),
+		mcp.WithBoolean("syncLocal", mcp.Description("Alias for syncLocalHerdr.")),
+		mcp.WithString("localWorkspaceLabel", mcp.Description("Optional custom label for local Herdr workspace (alias: LocalWorkspaceLabel, localLabel).")),
+		mcp.WithString("LocalWorkspaceLabel", mcp.Description("Alias for localWorkspaceLabel.")),
+		mcp.WithString("localLabel", mcp.Description("Alias for localWorkspaceLabel.")),
 	)
 
 	s.AddTool(connectTool, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -87,12 +96,63 @@ func registerCommandTools(s *server.MCPServer, client *sshclient.Client) {
 		keyPath := getParamString(request, "keyPath", "KeyPath", "key_path")
 		password := getParamString(request, "password", "Password")
 		sudoPassword := getParamString(request, "sudoPassword", "SudoPassword", "sudo_password")
+		syncLocal := getParamBool(request, true, "syncLocalHerdr", "SyncLocalHerdr", "syncLocal", "sync_local")
+		localLabel := getParamString(request, "localWorkspaceLabel", "LocalWorkspaceLabel", "localLabel", "workspaceLabel")
 
 		if err := client.ConnectTo(host, port, user, keyPath, password, sudoPassword); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to connect to %s: %v", host, err)), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf("Successfully connected to %s. CWD: %s", host, client.GetCwd())), nil
+		// 1. Gather quick remote host identity in 1 fast subshell probe
+		hostIdentity := host
+		if res, err := client.RunCommand("whoami; hostname; uname -sr; cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'", client.GetCwd(), false, 2000); err == nil {
+			lines := strings.Split(strings.TrimSpace(res.Stdout), "\n")
+			if len(lines) >= 3 {
+				osName := ""
+				if len(lines) >= 4 {
+					osName = lines[3]
+				} else {
+					osName = lines[2]
+				}
+				hostIdentity = fmt.Sprintf("%s@%s (%s, %s)", lines[0], lines[1], osName, lines[2])
+			}
+		}
+
+		// 2. Auto-initialize remote Herdr daemon
+		herdrStatus := "Herdr Remote: disabled"
+		if client.Herdr() != nil && client.Herdr().IsEnabled() {
+			if st, err := client.Herdr().SessionStatus(); err == nil {
+				herdrStatus = fmt.Sprintf("Herdr Remote: Ready (session: %q, root_pane: %s)", st.SessionName, st.DefaultPaneID)
+			} else {
+				herdrStatus = fmt.Sprintf("Herdr Remote: Initialized (%v)", err)
+			}
+		}
+
+		// 3. Auto-sync with local Herdr client if available
+		localHerdrStatus := "Local Herdr: not running or disabled"
+		if syncLocal && herdr.IsLocalHerdrAvailable() {
+			if localLabel == "" {
+				localLabel = host
+			}
+			if wsID, exists := herdr.LocalHerdrFindWorkspaceByLabel(localLabel); exists {
+				localHerdrStatus = fmt.Sprintf("Local Herdr: Attached (workspace: %s [%s])", localLabel, wsID)
+			} else {
+				sshCmd := fmt.Sprintf("ssh %s", host)
+				if wsID, paneID, err := herdr.LocalHerdrWorkspaceCreate(localLabel, "", sshCmd, false); err == nil {
+					localHerdrStatus = fmt.Sprintf("Local Herdr: Synced (workspace: %s [%s], pane: %s)", localLabel, wsID, paneID)
+				}
+			}
+		}
+
+		sudoStatus := "not configured"
+		if client.HasSudoPassword() {
+			sudoStatus = "Configured"
+		}
+
+		summary := fmt.Sprintf("✓ Connected to %s\n✓ %s\n✓ %s\n✓ Sudo: %s | CWD: %s",
+			hostIdentity, herdrStatus, localHerdrStatus, sudoStatus, client.GetCwd())
+
+		return mcp.NewToolResultText(summary), nil
 	})
 
 	// 0.1 remote_disconnect

@@ -65,42 +65,32 @@ func TestRegisterToolsWithTerminal(t *testing.T) {
 
 	// Verify server registered all tools without panic
 	tools := s.ListTools()
-	foundTerminalRun := false
-	foundTerminalSplit := false
-	foundTerminalRead := false
-	foundWsCreate := false
-	foundWsList := false
+	foundTools := make(map[string]bool)
 	for _, tool := range tools {
-		if tool.Tool.Name == "remote_terminal_run" {
-			foundTerminalRun = true
-		}
-		if tool.Tool.Name == "remote_terminal_split" {
-			foundTerminalSplit = true
-		}
-		if tool.Tool.Name == "remote_terminal_read" {
-			foundTerminalRead = true
-		}
-		if tool.Tool.Name == "remote_terminal_workspace_create" {
-			foundWsCreate = true
-		}
-		if tool.Tool.Name == "remote_terminal_workspace_list" {
-			foundWsList = true
-		}
+		foundTools[tool.Tool.Name] = true
 	}
 
-	if !foundTerminalRun {
-		t.Errorf("Expected tool remote_terminal_run to be registered")
+	requiredTools := []string{
+		"remote_connect",
+		"remote_run_command",
+		"remote_terminal_run",
+		"remote_terminal_split",
+		"remote_terminal_read",
+		"remote_terminal_workspace_create",
+		"remote_terminal_workspace_list",
+		"remote_agent_start",
+		"remote_agent_prompt",
+		"remote_agent_read",
+		"remote_agent_wait",
+		"remote_agent_list",
+		"local_herdr_status",
+		"local_herdr_workspace_create",
+		"local_herdr_attach",
 	}
-	if !foundTerminalSplit {
-		t.Errorf("Expected tool remote_terminal_split to be registered")
-	}
-	if !foundTerminalRead {
-		t.Errorf("Expected tool remote_terminal_read to be registered")
-	}
-	if !foundWsCreate {
-		t.Errorf("Expected tool remote_terminal_workspace_create to be registered")
-	}
-	if !foundWsList {
-		t.Errorf("Expected tool remote_terminal_workspace_list to be registered")
+
+	for _, name := range requiredTools {
+		if !foundTools[name] {
+			t.Errorf("Expected tool %s to be registered", name)
+		}
 	}
 }

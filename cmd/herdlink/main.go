@@ -13,7 +13,7 @@ import (
 func main() {
 	cfg, err := config.Parse()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Config error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Herdlink config error: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -30,7 +30,7 @@ func main() {
 	tools.RegisterTools(s, client)
 
 	if err := server.ServeStdio(s); err != nil {
-		fmt.Fprintf(os.Stderr, "MCP server stopped: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Herdlink server stopped: %v\n", err)
 		os.Exit(1)
 	}
 }
