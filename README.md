@@ -9,7 +9,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org)
 [![MCP Compliant](https://img.shields.io/badge/MCP-Protocol%20Compliant-7952B3?style=for-the-badge&logo=anthropic&logoColor=white)](https://modelcontextprotocol.io)
 [![Herdr Engine](https://img.shields.io/badge/Engine-Herdr%20Terminal%20Multiplexer-ff007f?style=for-the-badge&logo=gnometerminal&logoColor=white)](https://herdr.dev)
-[![Architecture](https://img.shields.io/badge/Topology-Multi--Agent%20Spatial%20PTY-00f0ff?style=for-the-badge)](https://github.com/surtr85/mcp-ssh-workspace)
+[![Architecture](https://img.shields.io/badge/Topology-Multi--Agent%20Spatial%20PTY-00f0ff?style=for-the-badge)](https://github.com/surtr85/herdlink)
 [![NixOS Flake](https://img.shields.io/badge/NixOS-Declarative%20Flake-5277C3?style=for-the-badge&logo=nixos&logoColor=white)](https://nixos.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
@@ -220,7 +220,7 @@ userSettings.globalPermissionGrants.allow = [
 ### Standard CLI Installation
 ```bash
 # Clone and build
-git clone https://github.com/surtr85/mcp-ssh-workspace.git herdlink
+git clone https://github.com/surtr85/herdlink.git herdlink
 cd herdlink
 go build -o herdlink cmd/herdlink/main.go
 
