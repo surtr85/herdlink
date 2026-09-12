@@ -141,7 +141,7 @@ func registerCommandTools(s *server.MCPServer, client *sshclient.Client) {
 				if client.User() != "" && !strings.Contains(host, "@") {
 					target = fmt.Sprintf("%s@%s", client.User(), host)
 				}
-				herdrRemoteCmd := fmt.Sprintf("herdr --remote %s", target)
+				herdrRemoteCmd := fmt.Sprintf("env -u HERDR_ENV -u HERDR_SOCKET_PATH -u HERDR_PANE_ID -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID herdr --remote %s", target)
 				if wsID, paneID, err := herdr.LocalHerdrWorkspaceCreate(localLabel, "", herdrRemoteCmd, false); err == nil {
 					localHerdrStatus = fmt.Sprintf("Local Herdr: Synced (workspace: %s [%s], pane: %s)", localLabel, wsID, paneID)
 				}

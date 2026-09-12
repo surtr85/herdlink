@@ -83,7 +83,7 @@ func registerLocalHerdrTools(s *server.MCPServer, client *sshclient.Client) {
 		if client != nil && client.User() != "" && !strings.Contains(host, "@") {
 			target = fmt.Sprintf("%s@%s", client.User(), host)
 		}
-		herdrRemoteCmd := fmt.Sprintf("herdr --remote %s", target)
+		herdrRemoteCmd := fmt.Sprintf("env -u HERDR_ENV -u HERDR_SOCKET_PATH -u HERDR_PANE_ID -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID herdr --remote %s", target)
 		wsID, paneID, err := herdr.LocalHerdrWorkspaceCreate(label, "", herdrRemoteCmd, false)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to attach local Herdr: %v", err)), nil
