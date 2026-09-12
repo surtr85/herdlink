@@ -52,7 +52,10 @@ func (m *Manager) herdrCmd(args ...string) string {
 	for _, a := range args {
 		escapedArgs = append(escapedArgs, fmt.Sprintf("%q", a))
 	}
-	return fmt.Sprintf("%sherdr --session %q %s", m.pathEnv, m.sessionName, strings.Join(escapedArgs, " "))
+	if m.sessionName != "" {
+		return fmt.Sprintf("%sherdr --session %q %s", m.pathEnv, m.sessionName, strings.Join(escapedArgs, " "))
+	}
+	return fmt.Sprintf("%sherdr %s", m.pathEnv, strings.Join(escapedArgs, " "))
 }
 
 func (m *Manager) rawCmd(cmd string) string {
@@ -109,7 +112,11 @@ func (m *Manager) EnsureReady() error {
 
 	if snapCode != 0 || !strings.Contains(stdout, "session_snapshot") {
 		// Server is not running; start headless server in background
-		startServerCmd := m.rawCmd(fmt.Sprintf("nohup herdr --session %q server >/dev/null 2>&1 &", m.sessionName))
+		serverCmd := "nohup herdr server >/dev/null 2>&1 &"
+		if m.sessionName != "" {
+			serverCmd = fmt.Sprintf("nohup herdr --session %q server >/dev/null 2>&1 &", m.sessionName)
+		}
+		startServerCmd := m.rawCmd(serverCmd)
 		_, _, _, _ = m.exec(startServerCmd)
 
 		// Poll for up to 3 seconds for the socket to become ready
@@ -125,7 +132,11 @@ func (m *Manager) EnsureReady() error {
 
 		if !serverReady {
 			m.initialized = true
-			return fmt.Errorf("herdr server failed to start for session %q", m.sessionName)
+			sessionDesc := m.sessionName
+			if sessionDesc == "" {
+				sessionDesc = "default"
+			}
+			return fmt.Errorf("herdr server failed to start for session %q", sessionDesc)
 		}
 	}
 
@@ -612,8 +623,10 @@ func (m *Manager) CleanupSession() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	stopCmd := fmt.Sprintf("%sherdr session stop %q 2>/dev/null; herdr session delete %q 2>/dev/null", m.pathEnv, m.sessionName, m.sessionName)
-	_, _, _, _ = m.exec(stopCmd)
+	if m.sessionName != "" {
+		stopCmd := fmt.Sprintf("%sherdr session stop %q 2>/dev/null; herdr session delete %q 2>/dev/null", m.pathEnv, m.sessionName, m.sessionName)
+		_, _, _, _ = m.exec(stopCmd)
+	}
 	m.initialized = false
 	m.defaultPaneID = ""
 	return nil

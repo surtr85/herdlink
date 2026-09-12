@@ -80,13 +80,11 @@ func (c *Client) ConnectTo(host string, port int, user, keyPath, password, sudoP
 
 	enableHerdr := true
 	autoBootstrap := true
-	sessionName := "mcp-workspace"
+	sessionName := ""
 	if c.cfg != nil {
 		enableHerdr = c.cfg.EnableHerdr
 		autoBootstrap = c.cfg.AutoBootstrapHerdr
-		if c.cfg.HerdrSessionName != "" {
-			sessionName = c.cfg.HerdrSessionName
-		}
+		sessionName = c.cfg.HerdrSessionName
 	}
 
 	newCfg := &config.Config{
