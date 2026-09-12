@@ -92,7 +92,7 @@ flowchart TD
     subgraph RemoteHost["🌐 Remote Server / Cluster / VPS"]
         SSHD["sshd Daemon"]
         
-        subgraph HerdrDaemon["🧠 Herdr Headless Engine ('mcp-workspace')"]
+        subgraph HerdrDaemon["🧠 Herdr Headless Engine ('default' shared session)"]
             Workspace1["🪟 Workspace: Server Core"]
             Workspace2["🪟 Workspace: Background Services"]
             

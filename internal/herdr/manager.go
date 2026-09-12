@@ -23,10 +23,8 @@ type Manager struct {
 }
 
 func NewManager(exec ExecFunc, sessionName string, bootstrap, enabled bool) *Manager {
-	if sessionName == "" {
-		sessionName = "mcp-workspace"
-	}
 	return &Manager{
+
 		exec:        exec,
 		sessionName: sessionName,
 		bootstrap:   bootstrap,
