@@ -17,8 +17,8 @@ Agent (Antigravity/Claude) <--> Herdlink MCP Engine <--> SSH / Herdr Multiplexer
                                        +--> Local Herdr Client (Live Human GUI)
 ```
 
-1. **Remote Herdr Headless Engine**: Runs a persistent daemon (default shared session or named session) on the remote server. Survives network disconnects. Hosts workspaces (`w1`, `w2`), tabs, and panes (`w1:p1`).
-2. **Local Herdr Native Remote Bridge**: Syncs directly with the user's local Herdr app via native `herdr --remote <host>` so both the developer and AI agent share the exact same live workspace in real time.
+1. **Remote Herdr Headless Engine**: Runs a persistent daemon (default shared session) on the remote server. Survives network disconnects. Hosts workspaces (`w1`, `w2`), tabs, and panes (`w1:p1`).
+2. **Independent Human Telemetry**: The agent operates 100% headless over SSH. When the human developer wants to observe or pair-program, the developer independently opens a separate terminal window and runs `herdr --remote <user>@<host>`. The agent **NEVER** touches or spawns workspaces in the user's local running Herdr application.
 3. **SFTP Subsystem**: Delivers binary-safe, line-sliced file reading and atomic search-and-replace chunk editing directly over SFTP without invoking shell commands.
 
 ---
@@ -30,8 +30,7 @@ Agent (Antigravity/Claude) <--> Herdlink MCP Engine <--> SSH / Herdr Multiplexer
 ```json
 {
   "host": "192.168.1.69",
-  "user": "amadeus",
-  "syncLocalHerdr": true
+  "user": "amadeus"
 }
 ```
 
@@ -39,20 +38,25 @@ Herdlink executes the following automatically:
 
 - Resolves `~/.ssh/config` host aliases or direct IPs.
 - Establishes persistent SSH2 & SFTP connection pool.
-- Verifies / auto-bootstraps remote Herdr daemon and initializes root pane.
-- Opens an interactive workspace in the user's local Herdr UI (`syncLocalHerdr: true`) via native `herdr --remote <host>` so the user can observe live.
+- Verifies / auto-bootstraps remote Herdr daemon and initializes root pane on remote host.
 - Probes kernel, OS, hostname, and sudo privileges in a single subshell.
+- **Never touches the local Herdr UI (`syncLocalHerdr: false` by default).**
 
-### Returned Status (<50 Tokens):
+### Returned Status (<40 Tokens):
 
 ```text
 ✓ Connected to amadeus@Home (Debian GNU/Linux 13, Linux 6.12.95)
-✓ Herdr Remote: Ready (session: "default", root_pane: w1:p1)
-✓ Local Herdr: Synced (workspace: HomeServer [w37], pane: w37:p1)
-✓ Sudo: Configured | CWD: /home/amadeus
+✓ Herdr Remote: Ready (session: "", root_pane: wF:p1)
+✓ Sudo: not configured | CWD: /home/amadeus
 ```
 
 **Do NOT follow up with `remote_session_info`, `uname`, or `whoami`.** All necessary context is already returned.
+
+### ⛔ Cardinal Rule: Never Touch Local Herdr
+
+- **DO NOT** use `local_herdr_*` tools or pass `syncLocalHerdr: true` unless explicitly and unambiguously requested by the user.
+- The user runs their own local Herdr for their own active work (VPN, local dev). Spawning tabs or running `herdr --remote` inside the user's local Herdr disrupts their active workspace.
+- The user will open their own terminal to run `herdr --remote <host>` whenever they choose to inspect your work.
 
 ---
 
